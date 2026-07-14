@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sushi Tower</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1a1a1a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: white;
+        font-family: "Courier New", Courier, monospace;
+        overflow: hidden;
+        user-select: none;
+      }
+      #ui {
+        display: flex;
+        justify-content: space-between;
+        width: 500px;
+        margin-bottom: 10px;
+        font-size: 18px;
+        font-weight: bold;
+      }
+      canvas {
+        border: 4px solid #ff4e50;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      }
+      #overlay {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.9);
+        width: 500px;
+        height: 600px;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        text-align: center;
+        z-index: 10;
+      }
+      #overlay h2 {
+        font-size: 36px;
+        margin-bottom: 10px;
+        color: #ff4e50;
+      }
+      button {
+        background: #ff4e50;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        font-size: 18px;
+        cursor: pointer;
+        border-radius: 5px;
+        font-family: inherit;
+        margin-top: 15px;
+      }
+      button:hover {
+        background: #fc354c;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  </head>
+  <body>
+    <div id="ui">
+      <div>УРОВЕНЬ: <span id="level-val">1</span></div>
+      <div id="lives-val" style="color: #ecc94b">ЖИЗНИ: ❤️❤️❤️❤️❤️</div>
+      <div style="color: #ff4e50">ВРЕМЯ: <span id="timer-val">30</span>с</div>
+    </div>
+
+    <div style="position: relative">
+      <div id="overlay">
+        <h2 id="overlay-title">ПОБЕДА!</h2>
+        <p id="overlay-text">Переходим на следующий уровень...</p>
+        <button id="overlay-btn" onclick="nextLevel()">Далее</button>
+      </div>
+      <div id="canvas-container"></div>
+    </div>
+
+    <p style="margin-top: 15px; color: #a0aec0">
+      Управление: СТРЕЛОЧКИ ВЛЕВО / ВПРАВО (или A / D)
+    </p>
+
+    <script>
+      const { Engine, Render, Runner, Bodies, Composite, Body, Events } =
+        Matter;
+
+      const engine = Engine.create();
+      const world = engine.world;
+      const width = 500;
+      const height = 600;
+
+      // Создаем аудио-объект для звука приземления
+      const landSound = new Audio("land.wav");
+
+      // Функция для воспроизведения звука
+      function playLandSound() {
+        landSound.currentTime = 0; // Сбрасываем звук на начало, чтобы он мог играть часто
+        landSound.volume = 0.5; // Громкость 50%
+        landSound.play().catch((e) => {
+          // Браузеры иногда блокируют автозвук до первого клика по экрану
+          console.log("Звук заблокирован браузером. Кликни по экрану!");
+        });
+      }
+
+      const render = Render.create({
+        element: document.getElementById("canvas-container"),
+        engine: engine,
+        options: {
+          width: width,
+          height: height,
+          wireframes: false,
+          background: "#2d3748",
+        },
+      });
+
+      Render.run(render);
+      const runner = Runner.create();
+      Runner.run(runner, engine);
+
+      const plate = Bodies.rectangle(width / 2, height - 35, 320, 20, {
+        isStatic: true,
+        render: { fillStyle: "#d69e2e" },
+      });
+      Composite.add(world, plate);
+
+      const levels = [
+        {
+          level: 1,
+          heightPercent: 0.5,
+          time: 30,
+          spawnRate: 1500,
+          gravity: 0.4,
+          controlSpeed: 5,
+          label: "50% высоты",
+        },
+        {
+          level: 2,
+          heightPercent: 0.7,
+          time: 35,
+          spawnRate: 1200,
+          gravity: 0.6,
+          controlSpeed: 7,
+          label: "70% высоты",
+        },
+        {
+          level: 3,
+          heightPercent: 0.95,
+          time: 40,
+          spawnRate: 900,
+          gravity: 1,
+          controlSpeed: 9,
+          label: "100% высоты!",
+        },
+      ];
+
+      let currentLevelIndex = 0;
+      let timeLeft = 30;
+      let lives = 5;
+      let timerInterval = null;
+      let spawnInterval = null;
+      let gameActive = true;
+      let allSushi = [];
+      let activeSushi = null;
+
+      const keys = {};
+
+      const sushiConfigs = [
+        { type: "maki", w: 70, h: 25 },
+        { type: "salmon", w: 85, h: 32 },
+        { type: "tamago", w: 60, h: 45 },
+      ];
+
+      function getTargetY() {
+        const playableHeight = height - 150;
+        const percent = levels[currentLevelIndex].heightPercent;
+        return height - 35 - playableHeight * percent;
+      }
+
+      function drawRoundedRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function spawnFallingSushi() {
+        if (!gameActive) return;
+
+        const config =
+          sushiConfigs[Math.floor(Math.random() * sushiConfigs.length)];
+        const randomX = Math.random() * (width - 120) + 60;
+
+        const body = Bodies.rectangle(randomX, 50, config.w, config.h, {
+          isStatic: false,
+          restitution: 0.05,
+          friction: 0.9,
+          render: { visible: false },
+        });
+
+        body.sushiType = config.type;
+        body.w = config.w;
+        body.h = config.h;
+        body.hasLanded = false;
+
+        activeSushi = body;
+        allSushi.push(body);
+        Composite.add(world, body);
+      }
+
+      function updateUI() {
+        document.getElementById("level-val").innerText = currentLevelIndex + 1;
+        document.getElementById("timer-val").innerText = timeLeft;
+
+        let hearts = "";
+        for (let i = 0; i < 5; i++) {
+          hearts += i < lives ? "❤️" : "🖤";
+        }
+        document.getElementById("lives-val").innerText = "ЖИЗНИ: " + hearts;
+      }
+
+      function startTimers() {
+        clearInterval(timerInterval);
+        clearInterval(spawnInterval);
+
+        timeLeft = levels[currentLevelIndex].time;
+        engine.gravity.y = levels[currentLevelIndex].gravity;
+        updateUI();
+
+        timerInterval = setInterval(() => {
+          if (!gameActive) return;
+          timeLeft--;
+          updateUI();
+
+          if (timeLeft <= 0) {
+            endGame(false, "ВРЕМЯ ВЫШЛО! ⏰");
+          }
+        }, 1000);
+
+        spawnInterval = setInterval(() => {
+          if (!gameActive) return;
+          spawnFallingSushi();
+        }, levels[currentLevelIndex].spawnRate);
+      }
+
+      // Детектор столкновений со встроенным проигрыванием звука
+      Events.on(engine, "collisionStart", (event) => {
+        event.pairs.forEach((pair) => {
+          const bodyA = pair.bodyA;
+          const bodyB = pair.bodyB;
+
+          let playSound = false;
+
+          // Если коснулись тарелки и еще не приземлялись
+          if (bodyA === plate && !bodyB.hasLanded) {
+            bodyB.hasLanded = true;
+            playSound = true;
+          }
+          if (bodyB === plate && !bodyA.hasLanded) {
+            bodyA.hasLanded = true;
+            playSound = true;
+          }
+
+          // Если коснулись другой приземлившейся суши
+          if (bodyA.hasLanded && !bodyB.hasLanded) {
+            bodyB.hasLanded = true;
+            playSound = true;
+          }
+          if (bodyB.hasLanded && !bodyA.hasLanded) {
+            bodyA.hasLanded = true;
+            playSound = true;
+          }
+
+          // Воспроизводим звук только в момент ПЕРВОГО приземления
+          if (playSound) {
+            playLandSound();
+          }
+
+          if (activeSushi && (activeSushi === bodyA || activeSushi === bodyB)) {
+            if (bodyA.hasLanded && bodyB.hasLanded) {
+              activeSushi = null;
+            }
+          }
+        });
+      });
+
+      // Игровой цикл обновлений
+      Events.on(engine, "afterUpdate", () => {
+        if (!gameActive) return;
+
+        if (activeSushi && !activeSushi.hasLanded) {
+          let speed = levels[currentLevelIndex].controlSpeed;
+          if (keys["ArrowLeft"] || keys["KeyA"]) {
+            Body.setVelocity(activeSushi, {
+              x: -speed,
+              y: activeSushi.velocity.y,
+            });
+          }
+          if (keys["ArrowRight"] || keys["KeyD"]) {
+            Body.setVelocity(activeSushi, {
+              x: speed,
+              y: activeSushi.velocity.y,
+            });
+          }
+        }
+
+        let highestY = height;
+
+        for (let i = allSushi.length - 1; i >= 0; i--) {
+          const sushi = allSushi[i];
+
+          if (sushi.position.y > height + 50) {
+            if (activeSushi === sushi) activeSushi = null;
+
+            Composite.remove(world, sushi);
+            allSushi.splice(i, 1);
+            lives--;
+            updateUI();
+
+            if (lives <= 0) {
+              endGame(false, "СЛИШКОМ МНОГО СУШИ УПАЛО! 😭🍣");
+              return;
+            }
+            continue;
+          }
+
+          if (sushi.hasLanded && sushi.speed < 1.5) {
+            if (sushi.position.y < highestY) {
+              highestY = sushi.position.y;
+            }
+          }
+        }
+
+        if (highestY < getTargetY()) {
+          endGame(true);
+        }
+      });
+
+      Events.on(render, "afterRender", () => {
+        const context = render.context;
+        const targetY = getTargetY();
+
+        context.beginPath();
+        context.setLineDash([10, 10]);
+        context.moveTo(0, targetY);
+        context.lineTo(width, targetY);
+        context.lineWidth = 3;
+        context.strokeStyle = "#38a169";
+        context.stroke();
+
+        context.fillStyle = "#38a169";
+        context.font = "14px Courier New";
+        context.fillText(
+          `ЦЕЛЬ: ${levels[currentLevelIndex].label}`,
+          10,
+          targetY - 10,
+        );
+
+        allSushi.forEach((sushi) => {
+          const { x, y } = sushi.position;
+          const angle = sushi.angle;
+          const type = sushi.sushiType;
+          const w = sushi.w;
+          const h = sushi.h;
+
+          context.save();
+          context.translate(x, y);
+          context.rotate(angle);
+
+          if (type === "maki") {
+            context.fillStyle = "#1a202c";
+            drawRoundedRect(context, -w / 2, -h / 2, w, h, 6);
+            context.fillStyle = "#f7fafc";
+            drawRoundedRect(context, -w / 2 + 6, -h / 2 + 4, w - 12, h - 8, 4);
+            context.fillStyle = "#e53e3e";
+            drawRoundedRect(context, -12, -4, 24, 8, 2);
+          } else if (type === "salmon") {
+            context.fillStyle = "#f7fafc";
+            drawRoundedRect(context, -w / 2 + 8, 0, w - 16, h / 2, 8);
+            context.fillStyle = "#ed8936";
+            drawRoundedRect(context, -w / 2, -h / 2, w, h / 2 + 2, 8);
+            context.strokeStyle = "rgba(255,255,255,0.6)";
+            context.lineWidth = 3;
+            context.beginPath();
+            for (let offset = -20; offset <= 20; offset += 15) {
+              context.moveTo(offset - 6, -h / 2 + 3);
+              context.lineTo(offset + 6, 2);
+            }
+            context.stroke();
+          } else if (type === "tamago") {
+            context.fillStyle = "#f7fafc";
+            drawRoundedRect(context, -w / 2 + 6, 4, w - 12, h / 2 - 4, 8);
+            context.fillStyle = "#ecc94b";
+            drawRoundedRect(context, -w / 2, -h / 2, w, h / 2 + 4, 8);
+            context.fillStyle = "#1a202c";
+            context.fillRect(-10, -h / 2, 20, h);
+          }
+
+          context.restore();
+        });
+      });
+
+      function endGame(isWin, reasonText = "") {
+        gameActive = false;
+        clearInterval(timerInterval);
+        clearInterval(spawnInterval);
+
+        const overlay = document.getElementById("overlay");
+        const title = document.getElementById("overlay-title");
+        const text = document.getElementById("overlay-text");
+        const btn = document.getElementById("overlay-btn");
+
+        overlay.style.display = "flex";
+
+        if (isWin) {
+          if (currentLevelIndex < levels.length - 1) {
+            title.innerText = "УРОВЕНЬ ПРОЙДЕН! 🎉";
+            title.style.color = "#38a169";
+            text.innerText = `Отличная башня!`;
+            btn.innerText = "Следующий уровень";
+            btn.onclick = () => loadLevel(currentLevelIndex + 1);
+          } else {
+            title.innerText = "ТЫ СУШИ-МАСТЕР! 👑🏆";
+            title.style.color = "#ecc94b";
+            text.innerText = "Невероятно! Ты построил башню до самого неба!";
+            btn.innerText = "Играть снова";
+            btn.onclick = () => loadLevel(0);
+          }
+        } else {
+          title.innerText = "ИГРА ОКОНЧЕНА!";
+          title.style.color = "#e53e3e";
+          text.innerText = reasonText;
+          btn.innerText = "Попробовать снова";
+          btn.onclick = () => loadLevel(currentLevelIndex);
+        }
+      }
+
+      function loadLevel(index) {
+        currentLevelIndex = index;
+        lives = 5;
+        activeSushi = null;
+        document.getElementById("overlay").style.display = "none";
+
+        allSushi.forEach((sushi) => Composite.remove(world, sushi));
+        allSushi = [];
+
+        gameActive = true;
+        startTimers();
+      }
+
+      window.addEventListener("keydown", (e) => {
+        keys[e.code] = true;
+      });
+
+      window.addEventListener("keyup", (e) => {
+        keys[e.code] = false;
+      });
+
+      loadLevel(0);
+    </script>
+  </body>
+</html>
