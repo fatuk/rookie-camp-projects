@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none"
+    />
+    <title>Level Devil</title>
+    <style>
+      body {
+        margin: 0;
+        background: #111;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100vh;
+        font-family: monospace;
+        overflow: hidden;
+        color: #ff66cc;
+        -webkit-user-select: none;
+        touch-action: none;
+      }
+      #ui-container {
+        position: relative;
+        width: 100%;
+        max-width: 800px;
+        padding: 10px;
+        box-sizing: border-box;
+      }
+      #ui {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      #level-select {
+        background: #000;
+        color: #ff66cc;
+        border: 2px solid #ff66cc;
+        font-weight: bold;
+        padding: 5px;
+      }
+      canvas {
+        width: 100%;
+        height: auto;
+        display: block;
+        border: 4px solid #ff66cc;
+        box-shadow: 0 0 15px #ff66cc;
+        background: #0000ff;
+      }
+      #skip-btn {
+        position: absolute;
+        right: 20px;
+        bottom: 90px;
+        background: #000;
+        color: #ff66cc;
+        border: 2px solid #ff66cc;
+        padding: 8px;
+        cursor: pointer;
+        display: none;
+        z-index: 10;
+      }
+
+      /* Кнопки для телефона */
+      #mobile-controls {
+        position: fixed;
+        bottom: 15px;
+        left: 0;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        padding: 0 20px;
+        box-sizing: border-box;
+        pointer-events: none;
+        z-index: 999;
+      }
+      .touch-btn {
+        width: 70px;
+        height: 70px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 3px solid #ff66cc;
+        color: #ff66cc;
+        border-radius: 50%;
+        font-size: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        pointer-events: auto;
+        touch-action: none;
+        box-shadow: 0 0 10px #ff66cc;
+      }
+      .touch-btn:active {
+        background: #ff66cc;
+        color: #000;
+      }
+      #move-group {
+        display: flex;
+        gap: 20px;
+        pointer-events: none;
+      }
+      #move-group .touch-btn {
+        pointer-events: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ui-container">
+      <div id="ui">
+        <div>
+          <label>ВЫБОР: </label>
+          <select id="level-select" onchange="selectLevel(this.value)"></select>
+        </div>
+        <div id="deaths-val" style="color: #ff0000">СМЕРТИ: 0</div>
+      </div>
+      <button id="skip-btn" onclick="skipCutscene()">Пропустить ⏭️</button>
+      <canvas id="gameCanvas" width="800" height="400"></canvas>
+    </div>
+
+    <div id="mobile-controls">
+      <div id="move-group">
+        <div class="touch-btn" id="btn-left">◀</div>
+        <div class="touch-btn" id="btn-right">▶</div>
+      </div>
+      <div class="touch-btn" id="btn-jump">▲</div>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const gravity = 0.5;
+      const keys = {};
+      const blockSize = 40;
+
+      let deaths = 0,
+        currentLevelIndex = 0,
+        goalMoved = false;
+      let gameState = "playing",
+        cutsceneTimer = 0,
+        completeTimer = 0,
+        fireworks = [];
+
+      let audioCtx = null;
+      function playTone(freq, duration) {
+        if (freq === 0) return;
+        try {
+          if (!audioCtx)
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = "triangle";
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(
+            0.001,
+            audioCtx.currentTime + duration,
+          );
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {}
+      }
+
+      const mlpNotes = [
+        392, 440, 494, 523, 0, 523, 587, 659, 698, 0, 784, 698, 659, 587, 523,
+        587, 392, 523, 587, 784,
+      ];
+
+      const levels = [
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "A..................B",
+          "#####...........####",
+          "#####....UUU....####",
+          "#####...........####",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A...................",
+          "####..F..F..F..F..##",
+          "####..#..#..#..#..##",
+          "####..#..#..#..#..##",
+        ],
+        [
+          "....................",
+          "....TTTTTTTTTTTT....",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A...................",
+          "####............####",
+          "####............####",
+          "####............####",
+        ],
+        [
+          ".......TT..T........",
+          "........#..#........",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "####............####",
+          "####....UUU.....####",
+          "####....UUUU....####",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "###...FF...FF...FF.##",
+          "###...##...##...##.##",
+          "###...##...##...##.##",
+        ],
+        [
+          "...................B",
+          "..................##",
+          "...............F.###",
+          "............F.######",
+          ".........F.#########",
+          "A......F.###########",
+          "####..##############",
+          "####..##############",
+          "####..##############",
+          "####..##############",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "####..UUUUUUUU..####",
+          "####............####",
+          "####............####",
+          "####............####",
+        ],
+        [
+          "....................",
+          "....................",
+          "....##########......",
+          "....##########......",
+          "....#TTTTTTTT#......",
+          "...................B",
+          "A...##########.....#",
+          "###.##########..####",
+          "###.............####",
+          "###.............####",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "##..T..U..F..T..U..#",
+          "##..#.....#..#.....#",
+          "##..#.....#..#.....#",
+        ],
+        [
+          "...................B",
+          "..................##",
+          ".................###",
+          "................####",
+          "...............#####",
+          "A......UU.....######",
+          "###..F.##.F..#######",
+          "###..#.##.#..#######",
+          "###..#.##.#..#######",
+          "###..#.##.#..#######",
+        ],
+        [
+          "....TTTTTTTTTTTT....",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "A..................B",
+          "#####...........####",
+          "#####....UU.....####",
+          "#####...........####",
+          "#####...........####",
+        ],
+        [
+          "...................B",
+          "..................##",
+          "A......FFUU....F.###",
+          "###....##......#####",
+          "###............#####",
+          "###....UU......#####",
+          "###............#####",
+          "###............#####",
+          "###............#####",
+          "###............#####",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "##.FFFFFFFFFFFFFF.##",
+          "##.##############.##",
+          "##.##############.##",
+          "##.##############.##",
+        ],
+        [
+          ".......TTTTTT.......",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "A..................B",
+          "####............####",
+          "####....UUUU....####",
+          "####............####",
+          "####............####",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "###..T..U..T..U..T.#",
+          "###..#..#..#..#..#.#",
+          "###..#..#..#..#..#.#",
+          "###..#..#..#..#..#.#",
+        ],
+        [
+          "A.......####.......B",
+          "###.....####.....###",
+          "###..FFF####..FF.###",
+          "###..#..####..#..###",
+          "###.....####.....###",
+          "###..UUT####TTTT.###",
+          "###.....####.....###",
+          "###..F........F..###",
+          "###..#........#..###",
+          "###..#........#..###",
+        ],
+        [
+          "...................B",
+          "..................##",
+          "................####",
+          "A...................",
+          "###..U..T..U..T..###",
+          "###..#..#..#..#..###",
+          "###..............###",
+          "###..............###",
+          "###..............###",
+          "###..............###",
+        ],
+        [
+          "....TTTT....TTTT....",
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "A..................B",
+          "###..UU......UU..###",
+          "###..##......##..###",
+          "###..##......##..###",
+          "###..##......##..###",
+        ],
+        [
+          "....................",
+          "....................",
+          "....................",
+          "....................",
+          "...................B",
+          "A..................#",
+          "####.T.U.F.T.U.F.####",
+          "####.#.#.#.#.#.#.####",
+          "####.#.#.#.#.#.#.####",
+          "####.#.#.#.#.#.#.####",
+        ],
+        [
+          "...................B",
+          "..................##",
+          "...............U.###",
+          "............F.######",
+          ".........T.#########",
+          "A......U.###########",
+          "###..F.#############",
+          "###..#.#############",
+          "###..#.#############",
+          "###..#.#############",
+        ],
+      ];
+
+      let player = {
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 30,
+        vx: 0,
+        vy: 0,
+        speed: 4,
+        jumpForce: 10,
+        grounded: false,
+      };
+      let goal = { x: 0, y: 0, width: 40, height: 50, originalX: 0 };
+      let platforms = [];
+      let startX = 50,
+        startY = 200;
+
+      let ponies = [
+        {
+          name: "Pinkie Pie",
+          x: 850,
+          y: 300,
+          body: "#ff66cc",
+          hair: "#ff007f",
+          jumpDelay: 0,
+          jumpTimer: 0,
+        },
+        {
+          name: "Twilight Sparkle",
+          x: 910,
+          y: 300,
+          body: "#9966cc",
+          hair: "#330066",
+          jumpDelay: 10,
+          jumpTimer: 0,
+        },
+        {
+          name: "Rainbow Dash",
+          x: 970,
+          y: 300,
+          body: "#66ccff",
+          hair: "#ff3333",
+          jumpDelay: 20,
+          jumpTimer: 0,
+        },
+        {
+          name: "Fluttershy",
+          x: 1030,
+          y: 300,
+          body: "#ffff99",
+          hair: "#ff99cc",
+          jumpDelay: 30,
+          jumpTimer: 0,
+        },
+        {
+          name: "Applejack",
+          x: 1090,
+          y: 300,
+          body: "#ff9933",
+          hair: "#ffff66",
+          jumpDelay: 40,
+          jumpTimer: 0,
+        },
+        {
+          name: "Rarity",
+          x: 1150,
+          y: 300,
+          body: "#f2f2f2",
+          hair: "#4a0e4e",
+          jumpDelay: 50,
+          jumpTimer: 0,
+        },
+      ];
+
+      function initLevelSelector() {
+        const selectEl = document.getElementById("level-select");
+        selectEl.innerHTML = "";
+        for (let i = 0; i < levels.length; i++) {
+          const opt = document.createElement("option");
+          opt.value = i;
+          opt.innerText = `УРОВЕНЬ ${i + 1}`;
+          selectEl.appendChild(opt);
+        }
+      }
+
+      function selectLevel(index) {
+        currentLevelIndex = parseInt(index);
+        loadLevel(currentLevelIndex);
+      }
+
+      function loadLevel(index) {
+        platforms = [];
+        goalMoved = false;
+        gameState = "playing";
+        document.getElementById("skip-btn").style.display = "none";
+        document.getElementById("level-select").value = index;
+
+        const currentMap = levels[index];
+        for (let row = 0; row < currentMap.length; row++) {
+          for (let col = 0; col < currentMap[row].length; col++) {
+            const char = currentMap[row][col];
+            const x = col * blockSize;
+            const y = row * blockSize;
+            if (char === "#")
+              platforms.push({
+                x,
+                y,
+                w: blockSize,
+                h: blockSize,
+                type: "normal",
+              });
+            else if (char === "T")
+              platforms.push({
+                x,
+                y,
+                w: blockSize,
+                h: blockSize,
+                type: "fall",
+                originalY: y,
+                targetY: y + 250,
+                currentY: y,
+                triggered: false,
+              });
+            else if (char === "U")
+              platforms.push({
+                x,
+                y,
+                w: blockSize,
+                h: blockSize,
+                type: "rise",
+                originalY: y + 150,
+                targetY: y - 40,
+                currentY: y + 150,
+                triggered: false,
+              });
+            else if (char === "F")
+              platforms.push({
+                x,
+                y,
+                w: blockSize,
+                h: blockSize,
+                type: "fake",
+                originalY: y,
+                targetY: y + 250,
+                currentY: y,
+                triggered: false,
+              });
+            else if (char === "A") {
+              startX = x + 5;
+              startY = y + 10;
+            } else if (char === "B") {
+              goal.x = x;
+              goal.y = y - 10;
+              goal.originalX = x;
+            }
+          }
+        }
+        resetPlayer();
+      }
+
+      function resetPlayer() {
+        player.x = startX;
+        player.y = startY;
+        player.vx = 0;
+        player.vy = 0;
+        goal.x = goal.originalX;
+        goalMoved = false;
+        platforms.forEach((p) => {
+          p.currentY = p.originalY;
+          p.triggered = false;
+        });
+      }
+
+      function checkXCollisions() {
+        platforms.forEach((p) => {
+          const pY =
+            p.type === "fall" || p.type === "rise" || p.type === "fake"
+              ? p.currentY
+              : p.y;
+          if (
+            player.x < p.x + p.w &&
+            player.x + player.width > p.x &&
+            player.y < pY + p.h &&
+            player.y + player.height > pY
+          ) {
+            if (player.vx > 0) player.x = p.x - player.width;
+            else if (player.vx < 0) player.x = p.x + p.w;
+          }
+        });
+      }
+
+      function checkYCollisions() {
+        player.grounded = false;
+        platforms.forEach((p) => {
+          const pY =
+            p.type === "fall" || p.type === "rise" || p.type === "fake"
+              ? p.currentY
+              : p.y;
+          if (
+            player.x < p.x + p.w &&
+            player.x + player.width > p.x &&
+            player.y < pY + p.h &&
+            player.y + player.height > pY
+          ) {
+            if (player.vy > 0) {
+              player.y = pY - player.height;
+              player.vy = 0;
+              player.grounded = true;
+              if (p.type === "fake") p.triggered = true;
+            } else if (player.vy < 0) {
+              player.y = pY + p.h;
+              player.vy = 0;
+            }
+          }
+        });
+      }
+
+      function startVictoryCutscene() {
+        gameState = "cutscene";
+        cutsceneTimer = 0;
+        fireworks = [];
+        document.getElementById("skip-btn").style.display = "block";
+        platforms = [{ x: 0, y: 340, w: 800, h: 60, type: "normal" }];
+        player.x = 100;
+        player.y = 310;
+        goal.x = -100;
+        ponies.forEach((p, idx) => {
+          p.x = 850 + idx * 70;
+          p.y = 300;
+        });
+      }
+
+      function skipCutscene() {
+        gameState = "victory_screen";
+      }
+      function restartGame() {
+        currentLevelIndex = 0;
+        deaths = 0;
+        document.getElementById("deaths-val").innerText = `СМЕРТИ: ${deaths}`;
+        loadLevel(currentLevelIndex);
+      }
+
+      function update() {
+        if (gameState === "playing") {
+          if (keys["ArrowRight"] || keys["KeyD"]) player.vx = player.speed;
+          else if (keys["ArrowLeft"] || keys["KeyA"]) player.vx = -player.speed;
+          else player.vx = 0;
+
+          player.x += player.vx;
+          checkXCollisions();
+
+          if (
+            (keys["ArrowUp"] || keys["Space"] || keys["KeyW"]) &&
+            player.grounded
+          ) {
+            player.vy = -player.jumpForce;
+            player.grounded = false;
+          }
+
+          player.vy += gravity;
+          player.y += player.vy;
+          checkYCollisions();
+
+          if (player.y > canvas.height) {
+            deaths++;
+            document.getElementById("deaths-val").innerText =
+              `СМЕРТИ: ${deaths}`;
+            resetPlayer();
+          }
+
+          if (currentLevelIndex === 1 && !goalMoved) {
+            if (Math.abs(player.x - goal.x) < 150) {
+              goal.x -= 200;
+              goalMoved = true;
+            }
+          }
+
+          platforms.forEach((p) => {
+            const playerCenterX = player.x + player.width / 2;
+            const platformCenterX = p.x + p.w / 2;
+            if (p.type === "fall") {
+              if (Math.abs(playerCenterX - platformCenterX) < 100)
+                p.triggered = true;
+              if (p.triggered && p.currentY < p.targetY) p.currentY += 12;
+            }
+            if (p.type === "rise") {
+              if (Math.abs(playerCenterX - platformCenterX) < 120)
+                p.triggered = true;
+              if (p.triggered && p.currentY > p.targetY) p.currentY -= 15;
+            }
+            if (p.type === "fake" && p.triggered && p.currentY < p.targetY)
+              p.currentY += 10;
+          });
+
+          if (
+            player.x < goal.x + goal.width &&
+            player.x + player.width > goal.x &&
+            player.y < goal.y + goal.height &&
+            player.y + player.height > goal.y
+          ) {
+            gameState = "level_complete";
+            completeTimer = 60;
+            playTone(600, 0.1);
+          }
+        } else if (gameState === "level_complete") {
+          completeTimer--;
+          if (completeTimer <= 0) {
+            currentLevelIndex++;
+            if (currentLevelIndex < levels.length) loadLevel(currentLevelIndex);
+            else startVictoryCutscene();
+          }
+        } else if (gameState === "cutscene") {
+          cutsceneTimer++;
+          if (cutsceneTimer % 15 === 0) {
+            const noteIdx = Math.floor(cutsceneTimer / 15) % mlpNotes.length;
+            playTone(mlpNotes[noteIdx], 0.15);
+          }
+
+          ponies.forEach((p) => {
+            if (p.x > 250) p.x -= 2;
+            else {
+              p.jumpTimer++;
+              const jumpY = Math.sin((p.jumpTimer + p.jumpDelay) * 0.15) * 40;
+              p.y = 300 + (jumpY < 0 ? jumpY : 0);
+            }
+          });
+
+          const playerJump = Math.sin(cutsceneTimer * 0.15) * 40;
+          player.y = 310 + (playerJump < 0 ? playerJump : 0);
+
+          if (cutsceneTimer % 12 === 0 && cutsceneTimer < 450) {
+            const colors = [
+              "#ff00ff",
+              "#ff0000",
+              "#ffff00",
+              "#00ff00",
+              "#00ffff",
+              "#ff66cc",
+            ];
+            const randomColor =
+              colors[Math.floor(Math.random() * colors.length)];
+            for (let i = 0; i < 8; i++) {
+              fireworks.push({
+                x: 400 + (Math.random() - 0.5) * 400,
+                y: 120 + (Math.random() - 0.5) * 80,
+                vx: (Math.random() - 0.5) * 5,
+                vy: (Math.random() - 0.5) * 5 - 1,
+                size: Math.random() * 4 + 2,
+                color: randomColor,
+                life: 60,
+              });
+            }
+          }
+
+          fireworks.forEach((f, idx) => {
+            f.x += f.vx;
+            f.y += f.vy;
+            f.vy += 0.05;
+            f.life--;
+            if (f.life <= 0) fireworks.splice(idx, 1);
+          });
+
+          if (cutsceneTimer > 600) gameState = "victory_screen";
+        } else if (gameState === "victory_screen") {
+          document.getElementById("skip-btn").style.display = "none";
+          if (keys["Space"] || keys["Enter"]) restartGame();
+        }
+      }
+
+      function drawPony(p) {
+        const x = p.x,
+          y = p.y;
+        ctx.fillStyle = p.body;
+        ctx.fillRect(x + 10, y + 15, 30, 20);
+        ctx.fillRect(x + 12, y + 30, 6, 12);
+        ctx.fillRect(x + 22, y + 30, 6, 12);
+        ctx.fillRect(x + 32, y + 30, 6, 12);
+        ctx.fillRect(x + 28, y + 5, 10, 15);
+        ctx.beginPath();
+        ctx.arc(x + 35, y + 5, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = p.hair;
+        ctx.beginPath();
+        ctx.arc(x + 28, y - 2, 8, 0, Math.PI * 2);
+        ctx.arc(x + 38, y - 4, 7, 0, Math.PI * 2);
+        ctx.arc(x + 5, y + 15, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#00ffff";
+        ctx.fillRect(x + 36, y + 2, 4, 4);
+      }
+
+      function draw() {
+        ctx.fillStyle = "#0000FF";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#00FF00";
+        platforms.forEach((p) => {
+          const drawY =
+            p.type === "fall" || p.type === "rise" || p.type === "fake"
+              ? p.currentY
+              : p.y;
+          ctx.fillRect(p.x, drawY, p.w, p.h);
+        });
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        if (goal.x > 0) {
+          ctx.fillRect(goal.x, goal.y, goal.width, goal.height);
+          ctx.fillStyle = "#00FF00";
+          ctx.font = "16px monospace";
+          ctx.fillText("Б", goal.x + 15, goal.y + 30);
+        }
+
+        if (gameState === "level_complete") {
+          ctx.fillStyle = "rgba(0,0,0,0.6)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#ff66cc";
+          ctx.font = "bold 36px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("УРОВЕНЬ ПРОЙДЕН! 🎉", 400, 200);
+          ctx.textAlign = "left";
+        }
+
+        if (gameState === "cutscene") {
+          const colors = [
+            "#ff0000",
+            "#ff7f00",
+            "#ffff00",
+            "#00ff00",
+            "#0000ff",
+            "#4b0082",
+            "#9400d3",
+          ];
+          colors.forEach((color, i) => {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            ctx.arc(400, 360, 220 - i * 10, Math.PI, 0);
+            ctx.stroke();
+          });
+          ponies.forEach((p) => drawPony(p));
+          fireworks.forEach((f) => {
+            ctx.fillStyle = f.color;
+            ctx.fillRect(f.x, f.y, f.size, f.size);
+          });
+
+          if (cutsceneTimer > 150) {
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 24px monospace";
+            ctx.textAlign = "center";
+            ctx.fillText("ДРУЖБА — ЭТО ЧУДО!", 400, 100);
+            ctx.fillText("ТЫ ПРОШЛА ВСЕ 20 УРОВНЕЙ! 🌈", 400, 140);
+            ctx.textAlign = "left";
+          }
+        }
+
+        if (gameState === "victory_screen") {
+          ctx.fillStyle = "#000000";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#ff66cc";
+          ctx.font = "bold 36px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText("ПОЗДРАВЛЯЕМ! 🎉", 400, 120);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "20px monospace";
+          ctx.fillText(`Всего смертей: ${deaths} 💀`, 400, 180);
+          ctx.fillText("Ты настоящий мастер прохождения!", 400, 220);
+          ctx.fillStyle = "#00ff00";
+          ctx.fillText("ТАПНИ ПО ЭКРАНУ ДЛЯ НОВОЙ ИГРЫ!", 400, 300);
+          ctx.textAlign = "left";
+        }
+      }
+
+      function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+      }
+
+      window.addEventListener("keydown", (e) => (keys[e.code] = true));
+      window.addEventListener("keyup", (e) => (keys[e.code] = false));
+
+      const bindTouch = (id, key) => {
+        const el = document.getElementById(id);
+        const trigger = (val) => {
+          keys[key] = val;
+          if (val && !audioCtx) playTone(1, 0.1);
+        };
+        el.addEventListener("touchstart", (e) => {
+          e.preventDefault();
+          trigger(true);
+        });
+        el.addEventListener("touchend", (e) => {
+          e.preventDefault();
+          trigger(false);
+        });
+        el.addEventListener("mousedown", () => trigger(true));
+        el.addEventListener("mouseup", () => trigger(false));
+      };
+      bindTouch("btn-left", "ArrowLeft");
+      bindTouch("btn-right", "ArrowRight");
+      bindTouch("btn-jump", "Space");
+
+      canvas.addEventListener("touchstart", () => {
+        if (gameState === "victory_screen") restartGame();
+      });
+      canvas.addEventListener("mousedown", () => {
+        if (gameState === "victory_screen") restartGame();
+      });
+
+      initLevelSelector();
+      loadLevel(currentLevelIndex);
+      loop();
+    </script>
+  </body>
+</html>
