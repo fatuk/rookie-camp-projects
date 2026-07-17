@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Ремонтник на башнях</title>
+    <style>
+      body {
+        margin: 0;
+        background-color: #1a1a1a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        color: white;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        overflow: hidden;
+      }
+      canvas {
+        background-color: #2c3e50;
+        border: 4px solid #34495e;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        border-radius: 8px;
+      }
+      .controls {
+        margin-top: 15px;
+        text-align: center;
+        color: #bdc3c7;
+      }
+      kbd {
+        background: #34495e;
+        padding: 3px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        color: #ecf0f1;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="controls">
+      <kbd>←</kbd> <kbd>→</kbd> перемещение | <kbd>↑</kbd> прыжок | Удерживайте
+      <kbd>Пробел</kbd> для джетпака | <kbd>↓</kbd> удар молотком по поломке (5
+      ударов)
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // Скорректированная физика для быстрого и отзывчивого управления
+      const GRAVITY = 0.01;
+      const FRICTION = 0.4;
+      const JETPACK_FORCE = 0.02;
+      const MAX_FUEL = 200;
+      const HITS_TO_FIX = 5;
+
+      // Состояние игры
+      let gameState = "playing"; // playing, level_complete, win, gameover
+      let lives = 3;
+      let currentLevelIndex = 0;
+
+      // Объекты текущего уровня
+      let platforms = [];
+      let repairs = [];
+      let door = {};
+
+      // Игрок
+      let player = {
+        x: 0,
+        y: 0,
+        width: 20,
+        height: 30,
+        vx: 0,
+        vy: 0,
+        speed: 5,
+        fuel: MAX_FUEL,
+        grounded: false,
+        color: "#00d2d3",
+      };
+
+      // --- МАССИВ УРОВНЕЙ ---
+      // Здесь можно настраивать уровни. Добавляйте новые объекты в массив для создания новых уровней.
+      const levels = [
+        {
+          name: "Легкий",
+          playerStart: { x: 50, y: 500 },
+          door: { x: 680, y: 290, w: 40, h: 60 },
+          platforms: [
+            { x: 30, y: 550, w: 200, h: 20 },
+            { x: 300, y: 450, w: 200, h: 20 },
+            { x: 550, y: 350, w: 200, h: 20 },
+          ],
+          repairs: [
+            { x: 120, y: 530, w: 20, h: 20 },
+            { x: 390, y: 430, w: 20, h: 20 },
+          ],
+        },
+        {
+          name: "Средний",
+          playerStart: { x: 50, y: 500 },
+          door: { x: 710, y: 90, w: 40, h: 60 },
+          platforms: [
+            { x: 30, y: 550, w: 100, h: 20 },
+            { x: 30, y: 400, w: 100, h: 20 },
+            { x: 30, y: 250, w: 100, h: 20 },
+            { x: 250, y: 480, w: 100, h: 20 },
+            { x: 250, y: 330, w: 100, h: 20 },
+            { x: 250, y: 180, w: 100, h: 20 },
+            { x: 480, y: 520, w: 100, h: 20 },
+            { x: 480, y: 380, w: 100, h: 20 },
+            { x: 480, y: 220, w: 100, h: 20 },
+            { x: 680, y: 300, w: 100, h: 20 },
+            { x: 680, y: 150, w: 100, h: 20 },
+          ],
+          repairs: [
+            { x: 60, y: 370, w: 20, h: 20 },
+            { x: 290, y: 150, w: 20, h: 20 },
+            { x: 520, y: 350, w: 20, h: 20 },
+            { x: 520, y: 490, w: 20, h: 20 },
+          ],
+        },
+        {
+          name: "Сложный",
+          playerStart: { x: 50, y: 500 },
+          door: { x: 710, y: 90, w: 40, h: 60 },
+          platforms: [
+            { x: 30, y: 550, w: 70, h: 20 },
+            { x: 30, y: 350, w: 70, h: 20 },
+            { x: 250, y: 450, w: 70, h: 20 },
+            { x: 450, y: 550, w: 70, h: 20 },
+            { x: 450, y: 350, w: 70, h: 20 },
+            { x: 250, y: 250, w: 70, h: 20 },
+            { x: 450, y: 150, w: 70, h: 20 },
+            { x: 680, y: 300, w: 70, h: 20 },
+            { x: 680, y: 150, w: 100, h: 20 },
+          ],
+          repairs: [
+            { x: 40, y: 330, w: 20, h: 20 },
+            { x: 270, y: 430, w: 20, h: 20 },
+            { x: 470, y: 530, w: 20, h: 20 },
+            { x: 270, y: 230, w: 20, h: 20 },
+            { x: 470, y: 130, w: 20, h: 20 },
+          ],
+        },
+      ];
+
+      // Ввод
+      const keys = {
+        ArrowLeft: false,
+        ArrowRight: false,
+        ArrowDown: false,
+        Space: false,
+      };
+
+      // Удар молотком регистрируется по нажатию клавиши (не по удержанию),
+      // чтобы нельзя было забить починку зажатой кнопкой за один кадр
+      let hammerQueued = false;
+      let hammerAnimTimer = 0;
+
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "ArrowLeft") keys.ArrowLeft = true;
+        if (e.code === "ArrowRight") keys.ArrowRight = true;
+        if (e.code === "Space") keys.Space = true;
+
+        if (e.code === "ArrowDown") {
+          if (!keys.ArrowDown) hammerQueued = true;
+          keys.ArrowDown = true;
+        }
+
+        // Переключение состояний по кнопке Enter
+        if (e.code === "Enter") {
+          if (gameState === "gameover" || gameState === "win") {
+            resetGame(true); // Полный сброс (на 1 уровень)
+          } else if (gameState === "level_complete") {
+            currentLevelIndex++;
+            resetGame(false); // Запуск следующего уровня
+          }
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.code === "ArrowLeft") keys.ArrowLeft = false;
+        if (e.code === "ArrowRight") keys.ArrowRight = false;
+        if (e.code === "ArrowDown") keys.ArrowDown = false;
+        if (e.code === "Space") keys.Space = false;
+      });
+
+      function initLevel() {
+        const levelData = levels[currentLevelIndex];
+
+        // Копируем данные уровня, чтобы не перезаписывать оригинал в массиве
+        platforms = JSON.parse(JSON.stringify(levelData.platforms));
+        door = JSON.parse(JSON.stringify(levelData.door));
+
+        // Добавляем свойства fixed/hits всем поломкам
+        repairs = levelData.repairs.map((r) => ({
+          x: r.x,
+          y: r.y,
+          w: r.w,
+          h: r.h,
+          fixed: false,
+          hits: 0,
+        }));
+
+        hammerQueued = false;
+        hammerAnimTimer = 0;
+
+        player.x = levelData.playerStart.x;
+        player.y = levelData.playerStart.y;
+        player.vx = 0;
+        player.vy = 0;
+        player.fuel = MAX_FUEL;
+      }
+
+      function resetGame(fullReset) {
+        if (fullReset) {
+          lives = 3;
+          currentLevelIndex = 0;
+        }
+        gameState = "playing";
+        initLevel();
+      }
+
+      function checkCollision(r1, r2) {
+        return (
+          r1.x < r2.x + r2.w &&
+          r1.x + r1.width > r2.x &&
+          r1.y < r2.y + r2.h &&
+          r1.y + r1.height > r2.y
+        );
+      }
+
+      function update() {
+        if (gameState !== "playing") return;
+
+        // Движение влево/вправо (ускорено)
+        if (keys.ArrowLeft) player.vx -= 2;
+        if (keys.ArrowRight) player.vx += 2;
+
+        player.vx *= FRICTION;
+
+        // Джетпак
+        let usingJetpack = false;
+        if (keys.Space && player.fuel > 0) {
+          player.vy -= JETPACK_FORCE;
+          player.fuel -= 1;
+          usingJetpack = true;
+        } else if (!usingJetpack && player.fuel < MAX_FUEL) {
+          player.fuel += 0.5;
+        }
+
+        player.vy += GRAVITY;
+        player.x += player.vx;
+
+        // Ограничение по краям экрана
+        if (player.x < 0) {
+          player.x = 0;
+          player.vx = 0;
+        }
+        if (player.x + player.width > canvas.width) {
+          player.x = canvas.width - player.width;
+          player.vx = 0;
+        }
+
+        // Обработка коллизий по X
+        platforms.forEach((p) => {
+          if (checkCollision(player, p)) {
+            if (player.vx > 0) player.x = p.x - player.width;
+            else if (player.vx < 0) player.x = p.x + p.w;
+            player.vx = 0;
+          }
+        });
+
+        player.y += player.vy;
+        player.grounded = false;
+
+        // Обработка коллизий по Y
+        platforms.forEach((p) => {
+          if (checkCollision(player, p)) {
+            if (player.vy > 0) {
+              player.y = p.y - player.height;
+              player.grounded = true;
+            } else if (player.vy < 0) {
+              player.y = p.y + p.h;
+            }
+            player.vy = 0;
+          }
+        });
+
+        // Починка молотком: удар засчитывается только по нажатию ArrowDown
+        if (hammerAnimTimer > 0) hammerAnimTimer--;
+
+        if (hammerQueued) {
+          const target = repairs.find(
+            (r) => !r.fixed && checkCollision(player, r),
+          );
+          if (target) {
+            target.hits++;
+            hammerAnimTimer = 10;
+            if (target.hits >= HITS_TO_FIX) {
+              target.fixed = true;
+            }
+          }
+          hammerQueued = false;
+        }
+
+        const allFixed = repairs.every((r) => r.fixed);
+
+        // Вход в открытую дверь
+        if (allFixed && checkCollision(player, door)) {
+          if (currentLevelIndex < levels.length - 1) {
+            gameState = "level_complete";
+          } else {
+            gameState = "win";
+          }
+        }
+
+        // Шипы (смерть)
+        if (player.y + player.height > canvas.height - 20) {
+          lives--;
+          if (lives <= 0) {
+            gameState = "gameover";
+          } else {
+            initLevel(); // Рестарт текущего уровня
+          }
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Отрисовка платформ
+        ctx.fillStyle = "#7f8c8d";
+        platforms.forEach((p) => {
+          ctx.fillStyle = "#34495e";
+          ctx.fillRect(p.x + 20, p.y, p.w - 40, canvas.height - p.y);
+          ctx.fillStyle = "#95a5a6";
+          ctx.fillRect(p.x, p.y, p.w, p.h);
+        });
+
+        // Отрисовка шипов
+        ctx.fillStyle = "#c0392b";
+        for (let i = 0; i < canvas.width; i += 20) {
+          ctx.beginPath();
+          ctx.moveTo(i, canvas.height);
+          ctx.lineTo(i + 10, canvas.height - 20);
+          ctx.lineTo(i + 20, canvas.height);
+          ctx.fill();
+        }
+
+        // Отрисовка поломок
+        repairs.forEach((r) => {
+          if (!r.fixed) {
+            ctx.fillStyle = "#e67e22";
+            ctx.fillRect(r.x, r.y, r.w, r.h);
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(r.x + 4, r.y + 4, 12, 4);
+
+            // Прогресс-бар ударов молотком над поломкой
+            const barW = r.w;
+            const barH = 4;
+            const barX = r.x;
+            const barY = r.y - 8;
+            ctx.fillStyle = "rgba(0,0,0,0.5)";
+            ctx.fillRect(barX, barY, barW, barH);
+            ctx.fillStyle = "#f1c40f";
+            ctx.fillRect(barX, barY, (r.hits / HITS_TO_FIX) * barW, barH);
+          }
+        });
+
+        // Отрисовка двери
+        const allFixed = repairs.every((r) => r.fixed);
+        ctx.fillStyle = allFixed ? "#2ecc71" : "#e74c3c";
+        ctx.fillRect(door.x, door.y, door.w, door.h);
+        ctx.fillStyle = "#000";
+        ctx.fillRect(door.x + (allFixed ? 5 : 30), door.y + 25, 5, 10);
+
+        // Отрисовка игрока
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        // Джетпак
+        ctx.fillStyle = "#bdc3c7";
+        ctx.fillRect(player.x - 4, player.y + 5, 4, 20);
+
+        // Огонь джетпака
+        if (keys.Space && player.fuel > 0) {
+          ctx.fillStyle = "#f1c40f";
+          ctx.beginPath();
+          ctx.moveTo(player.x - 4, player.y + 25);
+          ctx.lineTo(player.x + 2, player.y + 40 + Math.random() * 10);
+          ctx.lineTo(player.x + 4, player.y + 25);
+          ctx.fill();
+        }
+
+        // Анимация замаха молотком
+        if (hammerAnimTimer > 0) {
+          const swing = hammerAnimTimer / 10; // 1 -> 0
+          const handleX = player.x + player.width + 2;
+          const handleY = player.y + 12 - swing * 14;
+          ctx.strokeStyle = "#8b5a2b";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(player.x + player.width, player.y + 15);
+          ctx.lineTo(handleX + 10, handleY);
+          ctx.stroke();
+          ctx.lineWidth = 1;
+          ctx.fillStyle = "#7f8c8d";
+          ctx.fillRect(handleX + 6, handleY - 5, 12, 10);
+        }
+
+        // UI: Уровень
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.fillText(
+          `Уровень: ${currentLevelIndex + 1} / ${levels.length} (${levels[currentLevelIndex].name})`,
+          20,
+          30,
+        );
+
+        // UI: Жизни
+        ctx.fillText(`Жизни: ${"❤️".repeat(lives)}`, 20, 60);
+
+        // UI: Прогресс починки
+        const fixedCount = repairs.filter((r) => r.fixed).length;
+        ctx.fillText(`Починено: ${fixedCount} / ${repairs.length}`, 20, 90);
+
+        // UI: Топливо
+        ctx.fillText("Топливо:", 20, 120);
+        ctx.fillStyle = "#34495e";
+        ctx.fillRect(110, 105, 100, 15);
+        ctx.fillStyle = player.fuel > 30 ? "#3498db" : "#e74c3c";
+        ctx.fillRect(110, 105, (player.fuel / MAX_FUEL) * 100, 15);
+        ctx.strokeStyle = "#fff";
+        ctx.strokeRect(110, 105, 100, 15);
+
+        // Оверлеи состояний
+        if (gameState !== "playing") {
+          ctx.fillStyle = "rgba(0,0,0,0.7)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.textAlign = "center";
+
+          if (gameState === "gameover") {
+            ctx.fillStyle = "#e74c3c";
+            ctx.font = "50px Arial";
+            ctx.fillText("ИГРА ОКОНЧЕНА", canvas.width / 2, canvas.height / 2);
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText(
+              "Нажмите ENTER чтобы начать заново",
+              canvas.width / 2,
+              canvas.height / 2 + 50,
+            );
+          } else if (gameState === "level_complete") {
+            ctx.fillStyle = "#f1c40f";
+            ctx.font = "50px Arial";
+            ctx.fillText(
+              "УРОВЕНЬ ПРОЙДЕН!",
+              canvas.width / 2,
+              canvas.height / 2,
+            );
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText(
+              "Нажмите ENTER для следующего уровня",
+              canvas.width / 2,
+              canvas.height / 2 + 50,
+            );
+          } else if (gameState === "win") {
+            ctx.fillStyle = "#2ecc71";
+            ctx.font = "50px Arial";
+            ctx.fillText(
+              "ВСЕ УРОВНИ ПРОЙДЕНЫ!",
+              canvas.width / 2,
+              canvas.height / 2,
+            );
+            ctx.fillStyle = "white";
+            ctx.font = "20px Arial";
+            ctx.fillText(
+              "Нажмите ENTER чтобы сыграть еще раз",
+              canvas.width / 2,
+              canvas.height / 2 + 50,
+            );
+          }
+          ctx.textAlign = "left";
+        }
+      }
+
+      function gameLoop() {
+        update();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      // Запуск
+      initLevel();
+      gameLoop();
+    </script>
+  </body>
+</html>
