@@ -7,66 +7,88 @@
 </head>
 <body>
 <div id="ui-board">
-    <div class="text-level">Уровень: <span id="level-value">1</span>/5</div>
-    <div id="next-level-req" style="font-size: 14px; color: #b388ff; margin-bottom: 8px; text-shadow: 0 0 5px rgba(179,136,255,0.3);">До 2-го ур: 150 б.</div>
-    <div class="text-points">Очки: <span id="points-value">0</span></div>
-    <div class="text-coins">Монеты: <span id="coins-value">0</span></div>
-    <div class="text-lives">Жизни: <span id="lives-value">5</span></div>
+    <div class="text-level">Level: <span id="level-value">1</span>/5</div>
+    <div id="next-level-req" style="font-size: 14px; color: #b388ff; margin-bottom: 8px; text-shadow: 0 0 5px rgba(179,136,255,0.3);">To Lvl 2: 150 pts</div>
+    <div class="text-points">Score: <span id="points-value">0</span></div>
+    <div class="text-coins">Coins: <span id="coins-value">0</span></div>
+    <div class="text-lives" id="lives-value"></div>
 </div>
 
-<div id="shop-hint">🛒 Магазин [R]</div>
+<div id="shop-hint">🛒 Shop [R]</div>
 
-<!-- Магазин улучшений -->
+<!-- Upgrade Shop -->
 <div id="shop-panel" class="shop-hidden">
     <div class="shop-header">
-        <div class="shop-title">🛒 МАГАЗИН КИБЕР-ПУШКИ</div>
-        <button id="close-shop-btn" title="Закрыть (R)">×</button>
+        <div class="shop-title">🛒 CYBER-CANNON SHOP</div>
+        <button id="close-shop-btn" title="Close (R)">×</button>
     </div>
     
     <div class="shop-item">
         <div class="shop-item-info">
-            <span class="shop-item-name">⚡ Скорострельность</span>
-            <span class="shop-item-desc">Стреляй чаще (Ур. <span id="reload-lvl">0</span>/5)</span>
+            <span class="shop-item-name">⚡ Fire Rate</span>
+            <span class="shop-item-desc">Shoot faster (Lvl <span id="reload-lvl">0</span>/5)</span>
         </div>
-        <button id="buy-reload-btn" class="shop-btn">Купить: <span id="reload-cost">150</span> 🪙</button>
+        <button id="buy-reload-btn" class="shop-btn">Buy: <span id="reload-cost">150</span> 🪙</button>
     </div>
 
     <div class="shop-item">
         <div class="shop-item-info">
-            <span class="shop-item-name">❤️ Купить жизнь</span>
-            <span class="shop-item-desc">Восстанови здоровье (Макс. 10)</span>
+            <span class="shop-item-name">❤️ Buy Life</span>
+            <span class="shop-item-desc">Restore health (Max 10)</span>
         </div>
-        <button id="buy-life-btn" class="shop-btn">Купить: <span id="life-cost">100</span> 🪙</button>
+        <button id="buy-life-btn" class="shop-btn">Buy: <span id="life-cost">100</span> 🪙</button>
     </div>
 
     <div class="shop-item">
         <div class="shop-item-info">
-            <span class="shop-item-name">🔥 Тройной выстрел</span>
-            <span class="shop-item-desc">Стрельба веером из 3 снарядов</span>
+            <span class="shop-item-name">🔥 Triple Shot</span>
+            <span class="shop-item-desc">Spread fire with 3 bullets</span>
         </div>
-        <button id="buy-triple-btn" class="shop-btn">Купить: <span id="triple-cost">800</span> 🪙</button>
+        <button id="buy-triple-btn" class="shop-btn">Buy: <span id="triple-cost">800</span> 🪙</button>
     </div>
 
     <div class="shop-item">
         <div class="shop-item-info">
-            <span class="shop-item-name">🛡️ Силовой щит</span>
-            <span class="shop-item-desc">Поглощает 1 удар (зарядка 12 сек)</span>
+            <span class="shop-item-name">🛡️ Shield</span>
+            <span class="shop-item-desc">Absorbs 1 hit (12s cooldown)</span>
         </div>
-        <button id="buy-shield-btn" class="shop-btn">Купить: <span id="shield-cost">500</span> 🪙</button>
+        <button id="buy-shield-btn" class="shop-btn">Buy: <span id="shield-cost">500</span> 🪙</button>
     </div>
 
     <div class="shop-item">
         <div class="shop-item-info">
-            <span class="shop-item-name">💰 Военные трофеи</span>
-            <span class="shop-item-desc">+50% дохода (Ур. <span id="spoils-lvl">0</span>/3)</span>
+            <span class="shop-item-name">💰 Spoils of War</span>
+            <span class="shop-item-desc">+50% income (Lvl <span id="spoils-lvl">0</span>/3)</span>
         </div>
-        <button id="buy-spoils-btn" class="shop-btn">Купить: <span id="spoils-cost">250</span> 🪙</button>
+        <button id="buy-spoils-btn" class="shop-btn">Buy: <span id="spoils-cost">250</span> 🪙</button>
+    </div>
+
+    <!-- Elite Items -->
+    <div class="shop-item elite-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">💥 Nuke Strike [Q]</span>
+            <span class="shop-item-desc">Wipes all planes + clears bullets (20s CD)</span>
+        </div>
+        <button id="buy-nuke-btn" class="shop-btn elite-btn">Buy: <span id="nuke-cost">3000</span> 🪙</button>
+    </div>
+
+    <div class="shop-item elite-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">🌌 Hyper-Railgun</span>
+            <span class="shop-item-desc">Bullets pierce through enemies!</span>
+        </div>
+        <button id="buy-railgun-btn" class="shop-btn elite-btn">Buy: <span id="railgun-cost">2000</span> 🪙</button>
     </div>
 </div>
 
-<button id="reset-btn">Сбросить всё 🔄</button>
+<button id="reset-btn">Reset All 🔄</button>
 
 <div id="game-over-screen">GAME OVER</div>
+<div id="victory-screen">
+    <div class="victory-title">VICTORY!</div>
+    <div class="victory-subtitle">Earth is saved from invasion! 🎖️</div>
+</div>
+<div id="nuke-flash-screen"></div>
 
 <div id="square-1" class="target plane"></div>
 <div id="square-2" class="target plane"></div>

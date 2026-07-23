@@ -1,7 +1,11 @@
-body {
+html, body {
     margin: 0;
     padding: 0;
+    width: 100vw;
+    height: 100vh;
     overflow: hidden;
+}
+body {
     background-color: #222;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     user-select: none;
@@ -21,7 +25,17 @@ body {
 .text-level { color: #e040fb; font-size: 28px; margin-bottom: 5px; text-shadow: 0 0 10px rgba(224,64,251,0.5); }
 .text-points { color: #00e5ff; margin-bottom: 5px; }
 .text-coins { color: #ffeb3b; margin-bottom: 10px; }
-.text-lives { color: #F44336; margin-bottom: 15px; }
+.text-lives { 
+    display: flex; 
+    justify-content: flex-end; 
+    gap: 6px; 
+    margin-bottom: 15px; 
+}
+.pixel-heart {
+    width: 24px;
+    height: 24px;
+    display: inline-block;
+}
 
 /* Подсказка для магазина */
 #shop-hint {
@@ -146,6 +160,43 @@ body {
     display: none !important;
 }
 
+/* Элитные товары в магазине */
+.elite-item {
+    background: rgba(255, 215, 0, 0.08) !important;
+    border: 1px dashed #ffd700 !important;
+}
+.elite-item:hover {
+    border-color: #ffd700 !important;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+.elite-item .shop-item-name {
+    color: #ffd700;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+}
+.elite-btn {
+    background: linear-gradient(135deg, #ffd700, #ff9800) !important;
+    color: #000 !important;
+    text-shadow: none !important;
+}
+.elite-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ffe066, #ffb300) !important;
+    box-shadow: 0 0 12px #ffd700 !important;
+}
+
+/* Вспышка ядерного взрыва */
+#nuke-flash-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: white;
+    opacity: 0;
+    z-index: 99;
+    pointer-events: none;
+    transition: opacity 0.1s ease-out;
+}
+
 /* Кнопка полного сброса */
 #reset-btn {
     position: absolute;
@@ -189,6 +240,42 @@ body {
     z-index: 100;
     text-transform: uppercase;
     letter-spacing: 5px;
+}
+
+/* Экран победы */
+#victory-screen {
+    display: none; /* Скрыт по умолчанию */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(10, 25, 10, 0.9);
+    color: #4CAF50;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    text-transform: uppercase;
+    font-family: inherit;
+}
+.victory-title {
+    font-size: 80px;
+    font-weight: 950;
+    letter-spacing: 6px;
+    text-shadow: 0 0 30px rgba(76, 175, 80, 0.8);
+    margin-bottom: 20px;
+    animation: victory-glow 2.5s infinite ease-in-out;
+}
+.victory-subtitle {
+    font-size: 24px;
+    color: #00e5ff;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.5);
+    letter-spacing: 2px;
+}
+@keyframes victory-glow {
+    0%, 100% { transform: scale(1); text-shadow: 0 0 30px rgba(76, 175, 80, 0.8); }
+    50% { transform: scale(1.05); text-shadow: 0 0 55px rgba(76, 175, 80, 1); }
 }
 
 /* --- ЦЕЛИ (САМОЛЕТЫ И БОМБАРДИРОВЩИКИ) --- */
@@ -392,6 +479,64 @@ body {
     box-shadow: 0 0 8px #ffeb3b;
 }
 
+/* --- МОНЕТЫ --- */
+.coin {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: radial-gradient(circle, #ffeb3b 0%, #f57f17 100%);
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 12px #ffeb3b, inset 0 0 5px #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 900;
+    color: #5d4037;
+    z-index: 8;
+    pointer-events: none;
+    animation: coin-spin 1.2s infinite linear;
+}
+@keyframes coin-spin {
+    0% { transform: scaleX(1); }
+    50% { transform: scaleX(0.15); }
+    100% { transform: scaleX(1); }
+}
+
+/* --- ВЗРЫВЫ И ЧАСТИЦЫ --- */
+.explosion-bubble {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle, #ffeb3b 0%, #ff5722 50%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 12;
+    transform: translate(-50%, -50%);
+    animation: explode-bubble 0.4s ease-out forwards;
+}
+@keyframes explode-bubble {
+    0% { transform: translate(-50%, -50%) scale(0.2); opacity: 1; filter: blur(0px); }
+    100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; filter: blur(5px); }
+}
+
+.spark {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background-color: #ffeb3b;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 12;
+    box-shadow: 0 0 10px #ff5722, 0 0 20px #ff3d00;
+    animation: spark-fly 0.6s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+@keyframes spark-fly {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.1); opacity: 0; }
+}
+
 /* --- СИЛОВОЙ ЩИТ --- */
 #shield-bubble {
     position: absolute;
@@ -413,6 +558,19 @@ body {
 
 #shield-bubble.active {
     opacity: 1;
+}
+
+/* Эффект тряски экрана при получении урона */
+.shake-effect {
+    animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+    10%, 90% { transform: translate3d(-2px, 2px, 0) rotate(-0.5deg); }
+    20%, 80% { transform: translate3d(3px, -3px, 0) rotate(1deg); }
+    30%, 50%, 70% { transform: translate3d(-5px, 3px, 0) rotate(-1deg); }
+    40%, 60% { transform: translate3d(5px, -2px, 0) rotate(1deg); }
 }
 
 @keyframes shield-pulse {
