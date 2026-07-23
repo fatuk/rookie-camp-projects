@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Мой первый проект</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="ui-board">
+    <div class="text-level">Уровень: <span id="level-value">1</span>/5</div>
+    <div id="next-level-req" style="font-size: 14px; color: #b388ff; margin-bottom: 8px; text-shadow: 0 0 5px rgba(179,136,255,0.3);">До 2-го ур: 150 б.</div>
+    <div class="text-points">Очки: <span id="points-value">0</span></div>
+    <div class="text-coins">Монеты: <span id="coins-value">0</span></div>
+    <div class="text-lives">Жизни: <span id="lives-value">5</span></div>
+</div>
+
+<div id="shop-hint">🛒 Магазин [R]</div>
+
+<!-- Магазин улучшений -->
+<div id="shop-panel" class="shop-hidden">
+    <div class="shop-header">
+        <div class="shop-title">🛒 МАГАЗИН КИБЕР-ПУШКИ</div>
+        <button id="close-shop-btn" title="Закрыть (R)">×</button>
+    </div>
+    
+    <div class="shop-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">⚡ Скорострельность</span>
+            <span class="shop-item-desc">Стреляй чаще (Ур. <span id="reload-lvl">0</span>/5)</span>
+        </div>
+        <button id="buy-reload-btn" class="shop-btn">Купить: <span id="reload-cost">150</span> 🪙</button>
+    </div>
+
+    <div class="shop-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">❤️ Купить жизнь</span>
+            <span class="shop-item-desc">Восстанови здоровье (Макс. 10)</span>
+        </div>
+        <button id="buy-life-btn" class="shop-btn">Купить: <span id="life-cost">100</span> 🪙</button>
+    </div>
+
+    <div class="shop-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">🔥 Тройной выстрел</span>
+            <span class="shop-item-desc">Стрельба веером из 3 снарядов</span>
+        </div>
+        <button id="buy-triple-btn" class="shop-btn">Купить: <span id="triple-cost">800</span> 🪙</button>
+    </div>
+
+    <div class="shop-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">🛡️ Силовой щит</span>
+            <span class="shop-item-desc">Поглощает 1 удар (зарядка 12 сек)</span>
+        </div>
+        <button id="buy-shield-btn" class="shop-btn">Купить: <span id="shield-cost">500</span> 🪙</button>
+    </div>
+
+    <div class="shop-item">
+        <div class="shop-item-info">
+            <span class="shop-item-name">💰 Военные трофеи</span>
+            <span class="shop-item-desc">+50% дохода (Ур. <span id="spoils-lvl">0</span>/3)</span>
+        </div>
+        <button id="buy-spoils-btn" class="shop-btn">Купить: <span id="spoils-cost">250</span> 🪙</button>
+    </div>
+</div>
+
+<button id="reset-btn">Сбросить всё 🔄</button>
+
+<div id="game-over-screen">GAME OVER</div>
+
+<div id="square-1" class="target plane"></div>
+<div id="square-2" class="target plane"></div>
+<div id="square-3" class="target plane"></div>
+<div id="bomb-1" class="target bomber"></div>
+
+<div id="cannon">
+    <div id="shield-bubble"></div>
+    <div id="barrel"></div>
+    <div id="base"></div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>

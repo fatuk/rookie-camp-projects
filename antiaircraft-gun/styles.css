@@ -1,0 +1,422 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #222;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+}
+
+/* --- ИНТЕРФЕЙС --- */
+#ui-board {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 20;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    text-align: right;
+}
+.text-level { color: #e040fb; font-size: 28px; margin-bottom: 5px; text-shadow: 0 0 10px rgba(224,64,251,0.5); }
+.text-points { color: #00e5ff; margin-bottom: 5px; }
+.text-coins { color: #ffeb3b; margin-bottom: 10px; }
+.text-lives { color: #F44336; margin-bottom: 15px; }
+
+/* Подсказка для магазина */
+#shop-hint {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: #00e5ff;
+    font-size: 16px;
+    font-weight: bold;
+    background: rgba(17, 17, 17, 0.85);
+    padding: 10px 15px;
+    border: 2px solid #00e5ff;
+    border-radius: 8px;
+    z-index: 21;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+    transition: all 0.2s ease;
+}
+#shop-hint:hover {
+    transform: scale(1.05);
+    background: rgba(0, 229, 255, 0.1);
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+}
+
+/* --- МАГАЗИН УЛУЧШЕНИЙ --- */
+#shop-panel {
+    position: absolute;
+    top: 75px; /* Сместили ниже подсказки */
+    left: 20px;
+    width: 320px;
+    background: rgba(17, 17, 17, 0.85);
+    border: 2px solid #00e5ff;
+    border-radius: 10px;
+    padding: 15px;
+    z-index: 20;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+    color: white;
+}
+.shop-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(0, 229, 255, 0.3);
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+}
+.shop-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #00e5ff;
+    letter-spacing: 1px;
+}
+#close-shop-btn {
+    background: none;
+    border: none;
+    color: #ff3d00;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s, color 0.2s;
+    padding: 0 5px;
+    line-height: 1;
+}
+#close-shop-btn:hover {
+    color: #ff9100;
+    transform: scale(1.2);
+}
+.shop-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+.shop-item:hover {
+    border-color: rgba(255, 235, 59, 0.3);
+}
+.shop-item-info {
+    display: flex;
+    flex-direction: column;
+    max-width: 170px;
+}
+.shop-item-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+}
+.shop-item-desc {
+    font-size: 11px;
+    color: #bbb;
+    margin-top: 2px;
+}
+.shop-btn {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 105px;
+}
+.shop-btn:hover:not(:disabled) {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+.shop-btn:disabled {
+    background-color: #555;
+    color: #888;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Скрытие магазина */
+.shop-hidden {
+    display: none !important;
+}
+
+/* Кнопка полного сброса */
+#reset-btn {
+    position: absolute;
+    bottom: 20px;
+    right: 30px;
+    z-index: 20;
+    background-color: #ff9800;
+    color: #fff;
+    border: none;
+    padding: 8px 15px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+#reset-btn:hover {
+    background-color: #e65100;
+    transform: scale(1.05);
+}
+#reset-btn:active {
+    transform: scale(0.95);
+}
+
+/* Экран окончания игры */
+#game-over-screen {
+    display: none; /* Скрыт по умолчанию */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #F44336;
+    font-size: 80px;
+    font-weight: 900;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    text-transform: uppercase;
+    letter-spacing: 5px;
+}
+
+/* --- ЦЕЛИ (САМОЛЕТЫ И БОМБАРДИРОВЩИКИ) --- */
+.target {
+    position: absolute;
+    left: 0;
+    will-change: transform;
+    transition: opacity 0.1s;
+}
+
+/* Военные истребители */
+.plane {
+    width: 85px;
+    height: 20px;
+    position: absolute;
+    border-radius: 3px 25px 25px 3px / 3px 10px 10px 3px;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* Крылья и реактивное сопло (огонь двигателя) */
+.plane::before {
+    content: '';
+    position: absolute;
+    top: -22px;
+    left: 25px;
+    width: 20px;
+    height: 64px;
+    background: inherit;
+    border-radius: 4px;
+    transform: skewX(30deg); /* Хищный наклон крыла назад */
+    z-index: -1;
+    filter: brightness(0.85);
+    box-shadow: inset 3px 0 5px rgba(0,0,0,0.3);
+}
+
+/* Кабина пилота и реактивный шлейф */
+.plane::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    right: 20px;
+    width: 24px;
+    height: 8px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(0,229,255,0.7) 100%);
+    border-radius: 50% 50% 30% 30%;
+    box-shadow: 0 0 8px rgba(0,229,255,0.8);
+}
+
+/* Добавим пламя двигателя на левом конце истребителя */
+#square-1, #square-2, #square-3 {
+    background-image: linear-gradient(to right, #222 5%, transparent 15%);
+}
+
+#square-1 { 
+    background-color: #556b2f; /* Защитный зеленый */
+    border: 1px solid #3d4e22;
+    top: 50px; 
+} 
+#square-2 { 
+    background-color: #3b5e7c; /* Военно-морской синий */
+    border: 1px solid #2a4359;
+    top: 110px; 
+} 
+#square-3 { 
+    background-color: #3a3d40; /* Ночной стелс-серый */
+    border: 1px solid #252729;
+    top: 170px; 
+}
+
+/* Тяжелый бомбардировщик дальнего действия */
+.bomber {
+    width: 130px;
+    height: 30px;
+    background: linear-gradient(180deg, #1c1d22 0%, #0d0e10 100%);
+    border-radius: 5px 40px 40px 5px / 5px 15px 15px 5px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+    position: relative;
+    border-left: 5px solid #ff3d00; /* Хвостовое сопло огромного двигателя */
+}
+
+/* Огромные крылья Стелса */
+.bomber::before {
+    content: '';
+    position: absolute;
+    top: -40px;
+    left: 35px;
+    width: 32px;
+    height: 110px;
+    background: linear-gradient(90deg, #16171a 0%, #0d0e10 100%);
+    border-radius: 8px;
+    transform: skewX(35deg);
+    z-index: -1;
+    box-shadow: inset 4px 0 8px rgba(0,0,0,0.5);
+}
+
+/* Двойная остекленная кабина бомбардировщика */
+.bomber::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 25px;
+    width: 35px;
+    height: 9px;
+    background: linear-gradient(135deg, rgba(255, 61, 0, 0.9) 0%, rgba(139, 0, 0, 0.8) 100%);
+    border-radius: 50% 50% 20% 20%;
+    box-shadow: 0 0 12px rgba(255, 61, 0, 0.7);
+}
+
+#bomb-1 { top: 240px; }
+
+/* Вражеские снаряды / ракеты */
+.enemy-bullet {
+    width: 8px;
+    height: 22px;
+    background: linear-gradient(to bottom, #ff3d00, #ffeb3b);
+    border-radius: 4px;
+    position: absolute;
+    z-index: 4;
+    box-shadow: 0 0 10px #ff3d00;
+}
+
+/* Эффект попадания по зенитке (красная вспышка) */
+.hit-flash {
+    filter: drop-shadow(0 0 20px #ff3d00) brightness(1.5) sepia(1) hue-rotate(-50deg) saturate(5);
+    transition: filter 0.1s ease;
+}
+
+/* --- ПУШКА --- */
+#cannon {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    z-index: 10;
+}
+
+#barrel {
+    width: 34px;
+    height: 50px;
+    position: absolute;
+    bottom: 25px;
+    transform-origin: bottom center;
+    background: #2e3d1c; /* Тяжелая стальная муфта зенитки */
+    border-radius: 6px 6px 0 0;
+    border: 2px solid #1c2611;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+/* Левый ствол зенитки */
+#barrel::before {
+    content: '';
+    position: absolute;
+    bottom: 25px; /* Выступает далеко вперед */
+    left: 4px;
+    width: 10px;
+    height: 75px;
+    background: linear-gradient(90deg, #6b8e23, #4b6619);
+    border-radius: 2px 2px 0 0;
+    border-top: 5px solid #1c2611; /* Дульный тормоз-компенсатор */
+    box-shadow: inset -1px 0 3px rgba(0,0,0,0.3);
+}
+
+/* Правый ствол зенитки */
+#barrel::after {
+    content: '';
+    position: absolute;
+    bottom: 25px;
+    right: 4px;
+    width: 10px;
+    height: 75px;
+    background: linear-gradient(90deg, #6b8e23, #4b6619);
+    border-radius: 2px 2px 0 0;
+    border-top: 5px solid #1c2611;
+    box-shadow: inset -1px 0 3px rgba(0,0,0,0.3);
+}
+
+#base {
+    width: 90px;
+    height: 45px;
+    background: linear-gradient(to top, #2e3d1c, #485e2b);
+    border-radius: 15px 15px 0 0;
+    position: absolute;
+    bottom: 0;
+    border: 3px solid #1c2611;
+    border-bottom: 8px solid #12180b; /* Сверхпрочная станина */
+    box-shadow: 0 -4px 10px rgba(0,0,0,0.4);
+}
+
+/* --- СНАРЯДЫ --- */
+.bullet {
+    width: 10px;
+    height: 10px;
+    background-color: #ffeb3b;
+    border-radius: 50%;
+    position: absolute;
+    z-index: 5;
+    box-shadow: 0 0 8px #ffeb3b;
+}
+
+/* --- СИЛОВОЙ ЩИТ --- */
+#shield-bubble {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 115px;
+    height: 115px;
+    border: 3px solid #00e5ff;
+    border-radius: 50%;
+    background: rgba(0, 229, 255, 0.08);
+    box-shadow: 0 0 15px #00e5ff, inset 0 0 15px #00e5ff;
+    z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    animation: shield-pulse 2s infinite ease-in-out;
+}
+
+#shield-bubble.active {
+    opacity: 1;
+}
+
+@keyframes shield-pulse {
+    0% { transform: translateX(-50%) scale(1); box-shadow: 0 0 15px #00e5ff, inset 0 0 15px #00e5ff; }
+    50% { transform: translateX(-50%) scale(1.05); box-shadow: 0 0 25px #00e5ff, inset 0 0 20px #00e5ff; }
+    100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 15px #00e5ff, inset 0 0 15px #00e5ff; }
+}
